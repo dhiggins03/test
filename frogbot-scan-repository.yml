@@ -1,28 +1,48 @@
-name: "Frogbot Scan Repository"
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# Frogbot Scan and Fix does the following:
+# Automatically creates pull requests with fixes for vulnerable project dependencies.
+# Uses JFrog Xray to scan the project.
+# Read more about Frogbot here - https://docs.jfrog-applications.jfrog.io/jfrog-applications/frogbot
+
+# Some projects require creating a frogbot-config.yml file. Read more about it here - https://docs.jfrog-applications.jfrog.io/jfrog-applications/frogbot/setup-frogbot/frogbot-configuration
+
+name: "Frogbot Scan and Fix"
 on:
   workflow_dispatch:
   schedule:
-    # The repository will be scanned once a day at 00:00 GMT.
-    - cron: "0 0 * * *"
+    # Schedule the repository to be scanned every 5 minutes
+    - cron: "*/5 * * * *"
+  push:
+    branches: [ "main" ]
+    
 permissions:
   contents: write
   pull-requests: write
   security-events: write
-  # [Mandatory If using OIDC authentication protocol instead of JF_ACCESS_TOKEN]
-  # id-token: write
 jobs:
   scan-repository:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         # The repository scanning will be triggered periodically on the following branches.
-        branch: test-frogbot
+        branch: ["test-frogbot"]
     steps:
       - uses: jfrog/frogbot@v2
+
         env:
+          # [Mandatory if the two conditions below are met]
+          # 1. The project uses npm, yarn 2, NuGet or .NET to download its dependencies
+          # 2. The `installCommand` variable isn't set in your frogbot-config.yml file.
+          #
+          # The command that installs the project dependencies (e.g "npm i", "nuget restore" or "dotnet restore")
+          # JF_INSTALL_DEPS_CMD: ""
+
           # [Mandatory]
           # JFrog platform URL
-          JF_URL: https://dml.corp.payroc.com
+          JF_URL: ${{ secrets.JF_URL }}
 
           # [Mandatory if JF_USER and JF_PASSWORD are not provided]
           # JFrog access token with 'read' permissions on Xray service
@@ -37,14 +57,17 @@ jobs:
           # JF_PASSWORD: ${{ secrets.JF_PASSWORD }}
 
           # [Mandatory]
-          # The GitHub token is automatically generated for the job
-          JF_GIT_TOKEN: ${{ secrets.JF_GIT_TOKEN}}
+          # The GitHub token automatically generated for the job
+          JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          # [Mandatory]
-          # The name of the branch on which Frogbot will perform the scan
-          JF_GIT_BASE_BRANCH: test-frogbot
+          # [Optional]
+          # If the machine that runs Frogbot has no access to the internat, set the name of a remote repository
+          # in Artifactory, which proxies https://releases.jfrog.io/artifactory
+          # The 'frogbot' executable and other tools it needs will be downloaded through this repository.
+          # JF_RELEASES_REPO: ""
 
-        # [Mandatory if using OIDC authentication protocol instead of JF_ACCESS_TOKEN]
-        # Insert to oidc-provider-name the 'Provider Name' defined in the OIDC integration configured in the JPD
-        # with:
-        #   oidc-provider-name: ""
+          # [Optional]
+          # Frogbot will download the project dependencies, if they're not cached locally. To download the
+          # dependencies from a virtual repository in Artifactory, set the name of of the repository. There's no
+          # need to set this value, if it is set in the frogbot-config.yml file.
+          # JF_DEPS_REPO: ""
